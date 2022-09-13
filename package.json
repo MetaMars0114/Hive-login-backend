@@ -1,0 +1,29 @@
+{
+  "name": "downvote-control-tools-back",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "NODE_ENV=production node bin/www"
+  },
+  "dependencies": {
+    "@hivechain/dhive": "^0.13.0",
+    "body-parser": "^1.19.0",
+    "cookie-parser": "~1.4.4",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "debug": "~2.6.9",
+    "dotenv": "^8.1.0",
+    "dsteem": "^0.11.3",
+    "express": "~4.16.1",
+    "hivesigner": "^3.1.3",
+    "joi": "^14.3.1",
+    "morgan": "~1.9.1",
+    "mysql": "^2.17.1",
+    "node-json-db": "^1.0.1",
+    "request": "^2.88.0",
+    "request-promise-native": "^1.0.7",
+    "sc2-sdk": "^2.0.1",
+    "steem": "^0.7.7",
+    "xss": "^1.0.6"
+  }
+}
