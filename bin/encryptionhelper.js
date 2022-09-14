@@ -1,5 +1,6 @@
 "use strict";
 var crypto = require("crypto");
+var CryptoJS = require("crypto-js");
 
 var EncryptionHelper = (function () {
 
@@ -7,7 +8,7 @@ var EncryptionHelper = (function () {
         return new Promise(resolve => {
             crypto.pseudoRandomBytes(16, function (err, ivBuffer) {
 
-                var keyBuffer = (key instanceof Buffer) ? key : new Buffer(key);
+                var keyBuffer = (key instanceof Buffer) ? key : Buffer.from(key);
 
                 return resolve({
                     iv: ivBuffer,
@@ -17,28 +18,18 @@ var EncryptionHelper = (function () {
         });
     }
 
-    function encryptText(cipher_alg, key, iv, text, encoding) {
+    function encryptText(iv, text) {
 
-        var cipher = crypto.createCipheriv(cipher_alg, key, iv);
+        var encrypted = CryptoJS.AES.encrypt(text, iv);
 
-        encoding = encoding || "binary";
-
-        var result = cipher.update(text, "utf8", encoding);
-        result += cipher.final(encoding);
-
-        return result;
+        return encrypted;
     }
 
-    function decryptText(cipher_alg, key, iv, text, encoding) {
+    function decryptText(iv, text) {
 
-        var decipher = crypto.createDecipheriv(cipher_alg, key, iv);
+        var decrypted = CryptoJS.AES.decrypt(text, iv);
 
-        encoding = encoding || "binary";
-
-        var result = decipher.update(text, encoding);
-        result += decipher.final();
-
-        return result;
+        return decrypted;
     }
 
     return {

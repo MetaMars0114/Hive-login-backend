@@ -11,11 +11,11 @@ const client = new dhive.Client('https://anyx.io');
 
 const steem = require('steem');
 const bodyParser = require('body-parser');
-const urlencodedParser = bodyParser.urlencoded({limit: '500kb', extended: true});
+const urlencodedParser = bodyParser.urlencoded({ limit: '500kb', extended: true });
 const sanitize = require("xss");
 
 const encryptionHelper = require("../bin/encryptionhelper.js");
-const algorithm = encryptionHelper.CIPHERS.AES_256;
+const algorithm = encryptionHelper.CIPHERS.AES_128_CBC;
 
 /**
  Creates a pseudo-random string
@@ -36,8 +36,7 @@ function makeid(nb) {
  Gets the key and iv for aes encryption
  @iv - (optional) iv if we already have one, otherwise will be generated
  */
-function get_encryption_data(iv)
-{
+function get_encryption_data(iv) {
     return new Promise(async resolve => {
         let encryption_data = await encryptionHelper.getKeyAndIV(process.env.ENCRYPTION_PW);
         if (iv) {
@@ -57,7 +56,7 @@ function get_encryption_data(iv)
  @text - text to encrypt
  @initialisation_vector - (optional) iv if we already have one, otherwise will be generated
  */
-function encrypt (text, initialisation_vector) {
+function encrypt(text, initialisation_vector) {
     return new Promise(async resolve => {
         let data;
         let iv;
@@ -73,12 +72,16 @@ function encrypt (text, initialisation_vector) {
             if (!json_iv.data)
                 console.log(json_iv);
 
-            iv  = json_iv.data.toString();
+            iv = json_iv.data.toString();
         }
-        const encText = encryptionHelper.encryptText(algorithm, data.key, data.iv, text, "hex");
+
+        console.log(algorithm);
+        console.log(data);
+
+        const encText = encryptionHelper.encryptText(data.key, data.iv);
 
 
-        return resolve({encrypted : encText, iv : iv});
+        return resolve({ encrypted: encText, iv: iv });
     });
 }
 
@@ -87,11 +90,11 @@ function encrypt (text, initialisation_vector) {
  @encText - Encrypted text to decrypt
  @initialisation_vector - (optional) iv if we already have one, otherwise will be generated
  */
-function decrypt (encText, iv) {
+function decrypt(encText, iv) {
     return new Promise(async resolve => {
         const data = await get_encryption_data(iv);
 
-        const decText = encryptionHelper.decryptText(algorithm, data.key, data.iv, encText, "hex");
+        const decText = encryptionHelper.decryptText(data.key, data.iv);
         return resolve(decText);
     });
 }
@@ -99,12 +102,12 @@ function decrypt (encText, iv) {
 /**
  hivesigner login, redirects to the hivesigner domain for auth
  */
-router.get('/',  function(req, res, next) {
+router.get('/', function (req, res, next) {
     // init hivesigner
     let api = sc2.Initialize({
         app: config.account_username,
         callbackURL: req.app.get('env') === 'development' ? 'http://localhost:4002/auth/conf' : "https://back.downvotecontrol.com/auth/conf",
-        scope: ['login','vote'],
+        scope: ['login', 'vote'],
     });
 
     // get login URL
@@ -116,37 +119,34 @@ router.get('/',  function(req, res, next) {
  Fetches the encrypted keychain memo used for checking auth
  @username - username of the user wanting to log in
  */
-router.post('/keychain/fetch_memo', async function(req, res, next) {
+router.post('/keychain/fetch_memo', async function (req, res, next) {
     const username = sanitize(req.body.username);
 
     if (username && username.length < 16 && username.length > 3) {
         let data = await client.database.getAccounts([username]);
         let pub_key = data[0].posting.key_auths[0][0];
 
-        if (data.length === 1)
-        {
+        if (data.length === 1) {
             let user = await db("SELECT * from user_login where username = ?", username);
             let encoded_message = "";
             if (user.length === 0) {
 
-                let {encrypted, iv} = await encrypt(username);
+                let { encrypted, iv } = await encrypt(username);
 
-                encrypted = "#"+encrypted;
-
+                encrypted = "#" + encrypted;
+                console.log(encrypted, pub_key, process.env.WIF);
                 encoded_message = steem.memo.encode(process.env.WIF, pub_key, encrypted);
 
                 await db("INSERT INTO user_login(username, encrypted_username, iv, token) VALUES(?,?,?,'')", [username, encrypted, iv]);
-                res.send({status : "ok", message : encoded_message});
-            } else
-            {
+                res.send({ status: "ok", message: encoded_message });
+            } else {
                 // We recalculate each time in case the user has changed it's keys
                 encoded_message = steem.memo.encode(process.env.WIF, pub_key, user[0].encrypted_username);
-                res.send({status : "ok", message : encoded_message});
+                res.send({ status: "ok", message: encoded_message });
             }
 
-        } else
-        {
-            res.send({status : "ko"});
+        } else {
+            res.send({ status: "ko" });
         }
     }
 });
@@ -156,15 +156,14 @@ router.post('/keychain/fetch_memo', async function(req, res, next) {
  @username - username of the user wanting to log in
  @encrypted_username - username of the user encrypted
  */
-router.post('/keychain/login', async function(req, res, next) {
+router.post('/keychain/login', async function (req, res, next) {
     const username = sanitize(req.body.username);
     let encrypted_username = sanitize(req.body.encrypted_username);
 
     if (username && encrypted_username && username.length < 16 && username.length > 3) {
 
         let user = await db("SELECT * from user_login where username = ?", username);
-        if (user.length === 1 && user[0].encrypted_username === encrypted_username)
-        {
+        if (user.length === 1 && user[0].encrypted_username === encrypted_username) {
             // Remove leading #
             encrypted_username = encrypted_username.substr(1);
             let username_decrypted = await decrypt(encrypted_username, user[0].iv);
@@ -194,11 +193,11 @@ router.post('/keychain/login', async function(req, res, next) {
                     account.revote = false
                 }
 
-                return res.send({status: "ok", account});
+                return res.send({ status: "ok", account });
             }
         }
 
-        return res.send({status : "ko"});
+        return res.send({ status: "ko" });
     }
 });
 
@@ -209,7 +208,7 @@ router.post('/keychain/login', async function(req, res, next) {
  @token - hivesigner or keychain token
  @type - hivesigner or keychain
  */
-router.post('/user',urlencodedParser, async function(req, res, next) {
+router.post('/user', urlencodedParser, async function (req, res, next) {
 
     const username = sanitize(req.body.username);
     const token = sanitize(req.body.token);
@@ -225,12 +224,12 @@ router.post('/user',urlencodedParser, async function(req, res, next) {
 
             data = data[0];
 
-            return res.send({status : "ok", dv_threshold : data.dv_threshold, vp_threshold : data.vp_threshold, min_payout : data.min_payout, revote : data.revote === 1});
+            return res.send({ status: "ok", dv_threshold: data.dv_threshold, vp_threshold: data.vp_threshold, min_payout: data.min_payout, revote: data.revote === 1 });
         } else
-            return res.send({status : "ko"});
+            return res.send({ status: "ko" });
     }
 
-    return res.send({status : "ko", data : "no_infos"});
+    return res.send({ status: "ko", data: "no_infos" });
 });
 
 
@@ -239,7 +238,7 @@ router.post('/user',urlencodedParser, async function(req, res, next) {
  @username - steem username
  @access_token - hivesigner token
  */
-router.get('/conf',async function(req, res, next) {
+router.get('/conf', async function (req, res, next) {
 
     const username = sanitize(req.query.username);
     const access_token = sanitize(req.query.access_token);
@@ -270,7 +269,7 @@ router.get('/conf',async function(req, res, next) {
             }
 
             account.token = access_token;
-            return res.send("<script> window.opener.postMessage('"+JSON.stringify(account)+"',\"*\"); window.close()</script>");
+            return res.send("<script> window.opener.postMessage('" + JSON.stringify(account) + "',\"*\"); window.close()</script>");
         }
     }
 
@@ -284,7 +283,7 @@ router.get('/conf',async function(req, res, next) {
  @token - hivesigner or keychain token
  @type - hivesigner or keychain
  */
-router.post('/logout',urlencodedParser, async function(req, res, next) {
+router.post('/logout', urlencodedParser, async function (req, res, next) {
 
     const username = sanitize(req.body.username);
     const token = sanitize(req.body.token);
@@ -296,8 +295,7 @@ router.post('/logout',urlencodedParser, async function(req, res, next) {
 
         if (valid === true) {
 
-            if (type === "keychain")
-            {
+            if (type === "keychain") {
                 db("DELETE FROM user_login where username = ? AND token = ?", [username, token])
             } else {
                 let api = sc2.Initialize({
