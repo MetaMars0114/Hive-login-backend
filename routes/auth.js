@@ -75,11 +75,13 @@ function encrypt(text, initialisation_vector) {
             iv = json_iv.data.toString();
         }
 
-        console.log(algorithm);
-        console.log(data);
+        // console.log("in encrypt:", algorithm);
 
-        const encText = encryptionHelper.encryptText(data.key, data.iv);
-
+        //const encText = encryptionHelper.encryptText(data.key, data.iv);
+        console.log('before encrypt:', text, data.iv.toString())
+        const encText = encryptionHelper.encryptText(algorithm, data.key, data.iv, text, "hex");
+        let encrypted = "#" + encText;
+        console.log('after encrypt:', encrypted)
 
         return resolve({ encrypted: encText, iv: iv });
     });
@@ -94,8 +96,13 @@ function decrypt(encText, iv) {
     return new Promise(async resolve => {
         const data = await get_encryption_data(iv);
 
-        const decText = encryptionHelper.decryptText(data.key, data.iv);
-        return resolve(decText);
+        // const decText = encryptionHelper.decryptText(data.key, data.iv);
+        console.log('before decrypt:', encText, Buffer.from(data.iv))
+        const decText = encryptionHelper.decryptText(algorithm, data.key, Buffer.from(data.iv), encText, "hex");
+        console.log("after decrypt", decText);
+        var retText = Buffer.from(decText.toString(), 'hex').toString();
+        console.log("after decrypt", retText);
+        return resolve(retText);
     });
 }
 
@@ -134,7 +141,6 @@ router.post('/keychain/fetch_memo', async function (req, res, next) {
                 let { encrypted, iv } = await encrypt(username);
 
                 encrypted = "#" + encrypted;
-                console.log(encrypted, pub_key, process.env.WIF);
                 encoded_message = steem.memo.encode(process.env.WIF, pub_key, encrypted);
 
                 await db("INSERT INTO user_login(username, encrypted_username, iv, token) VALUES(?,?,?,'')", [username, encrypted, iv]);
@@ -163,11 +169,11 @@ router.post('/keychain/login', async function (req, res, next) {
     if (username && encrypted_username && username.length < 16 && username.length > 3) {
 
         let user = await db("SELECT * from user_login where username = ?", username);
+
         if (user.length === 1 && user[0].encrypted_username === encrypted_username) {
             // Remove leading #
             encrypted_username = encrypted_username.substr(1);
             let username_decrypted = await decrypt(encrypted_username, user[0].iv);
-
             if (username_decrypted === username) {
 
                 let token = makeid(40);

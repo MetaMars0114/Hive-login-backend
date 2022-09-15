@@ -6,7 +6,7 @@ const connection = mysql.createConnection({
     user: process.env.DB_USERNAME,
     password: process.env.DB_PASSWORD,
     database: 'downvote_control_tool',
-    charset: 'utf8',
+    charset: 'utf8mb4',
 });
 
 connection.connect();

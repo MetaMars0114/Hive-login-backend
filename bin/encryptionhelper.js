@@ -18,17 +18,26 @@ var EncryptionHelper = (function () {
         });
     }
 
-    function encryptText(iv, text) {
+    function encryptText(cipher_alg, key, iv, text, encoding) {
+        // var cipher = crypto.createCipheriv(cipher_alg, key, iv);
 
-        var encrypted = CryptoJS.AES.encrypt(text, iv);
+        // encoding = encoding || "binary";
+
+        // var result = cipher.update(text, "utf8", encoding);
+        // result += cipher.final(encoding);
+
+        // return result;
+
+
+        var encrypted = CryptoJS.AES.encrypt(text, iv.toString());
 
         return encrypted;
+
     }
 
-    function decryptText(iv, text) {
+    function decryptText(cipher_alg, key, iv, text, encoding) {
 
-        var decrypted = CryptoJS.AES.decrypt(text, iv);
-
+        var decrypted = CryptoJS.AES.decrypt(text, iv.toString());
         return decrypted;
     }
 
